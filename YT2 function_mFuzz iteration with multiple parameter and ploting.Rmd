@@ -1,0 +1,125 @@
+---
+title: 'YT2 function : mFuzz iteration with multiple parameter and ploting'
+author: "Yann Tapponnier"
+date: "15/03/2022"
+output: html_document
+---
+
+
+```{r setup, echo= F}
+knitr::opts_knit$set(include=TRUE,
+                     echo=TRUE,
+                     message = FALSE , 
+                     warning = F,
+                     root.dir = "/Volumes/Travail YT/sauvegarde travail YT/Labo UNIGE (Double Saved 17-04-2020)/2022 08 10 Labo UNIGE/Experiments/Bioinformatic - Seq/RNAseq Data/2021 10 Ramping clone analysis CC14/R Analysis/Data/")
+                     #load()
+```
+
+Libraries required
+```{r message=FALSE}
+library(devtools)
+library(tidyverse)
+library(Mfuzz)
+library(ggplot2)
+```
+
+Loading directly the exported tables
+
+
+```{r}
+setwd("/Volumes/Travail YT/sauvegarde travail YT/Labo UNIGE (Double Saved 17-04-2020)/2022 08 10 Labo UNIGE/Experiments/Bioinformatic - Seq/RNAseq Data/2021 10 Ramping clone analysis CC14/R Analysis/Data")
+
+GOI_union <- read.table("GOI_union.txt", sep= '\t', dec=",", row.names = 1, header = T)
+
+```
+
+
+# Mfuzz
+
+#### Writing the Funtion = YT2
+
+-   creates a working output directory including the dfname !  
+-   This function allow to import a df by its name.\
+-   lunch the mFuzz package depending on parameters we choose (=\> test with different c (number of clusters) and m (fuzzification parameter) parameters \#\#\#\#)\
+-   plot and save the PDF of cluster in the folder of our choise with the auto_generated name\
+-   it extract the geneset per each cluster\
+-   save the table with the same name in the same folder.\
+    ?acore = storing all the score of belonging to each cluster\
+
+```{r}
+YT2_Mfuzz <- function(GOI,n_cluster,m_fuzziness, output_diplay){
+  
+# Creating the subfolder for sorting the output
+dir.create(exporting_directory)
+  
+
+set.seed(123) #If you require reproducibility of the a soft clustering run, you need to set the seed of R's random number generator by e.g. set.seed(123).
+GOI <- get(dfname)
+GOI <- as.matrix(GOI)
+
+
+#YT2_Mfuzz(GOI, n_cluster, m_fuzziness)
+eset <-new("ExpressionSet", exprs = GOI); # exprs is the input object for Mfuzz and NEED to be a MATRIX NOT a data.frame
+      eset.r <- filter.NA(eset, thres = 0.25)
+      eset.f <- fill.NA(eset.r, mode = "mean")
+      tmp <- filter.std(eset.f, min.std = 0)
+      eset.s <- standardise(eset.f)
+
+       
+      cl <- mfuzz(eset.s, c= n_cluster, m=m_fuzziness)
+      
+# Calculating the mFuzz plot (if calculated directly after calling 'pdf()', can't be vizualised in Markdown)
+      p1 = mfuzz.plot2(eset.s, 
+                       cl = cl, 
+                       mfrow = output_diplay, 
+                       time.labels = colnames(GOI), 
+                       centre=TRUE, 
+                       centre.lwd=3, 
+                       x11=FALSE)
+# Saving out the mFuzz graphs in the folder    
+setwd(exporting_directory)
+      pdf(paste(sep="_","MFuzz",dfname,"c",n_cluster,"m",m_fuzziness,".pdf"), width = 22, height = 16)
+      print(p1) # YOU NEEEED to write print in the function otherwise PDF is blank. (outside of the FUNCTION Rstudio assume that you want to side the image and PRINT() it automatically)
+dev.off()
+     
+  # Ploting the graph in MARKOWN
+      p1
+#mfuzz.plot2(eset.s, cl = cl, mfrow = output_diplay, time.labels = colnames(GOI), centre=TRUE, centre.lwd=3, x11=FALSE)
+
+# Wrapping and exporting the geneset of each cluster
+       acore.list<-acore(eset.s,cl=cl,min.acore=0.7)
+
+i <- 1
+for(i in 1:length(acore.list)){
+  x <- acore.list[[i]]
+  y <- cbind(Cluster = rep(i,dim(x)[1]) , x) 
+  # "REP" rep(x,-times of repetition-) needs to be there when there are clusters with 0 genes
+  # dim = donne les nombre de row & col of a data.frame/matrix. 
+        #--> Here answer = 40 & 2 so I want        dim(x)[1] = 40.
+  # length give only the lenght of a vector.
+  
+  if(i==1)
+    z <- y
+  else
+    z <- rbind(z,y)
+}
+
+#Saving the table 
+    # Can be added only when saving the table to automatise the labeling. 
+    # paste(sep="_","MFuzz",dfname,"c",n_cluster,"m",m_fuzziness)) 
+      setwd(exporting_directory)
+      write.table(z, file= paste(sep="_","MFuzz",dfname,"c",n_cluster,"m",m_fuzziness,".txt"), sep="\t", quote=FALSE)
+}
+
+```
+
+
+#### First manual test Yann function 2
+```{r echo=TRUE, warning=FALSE}
+
+dfname <- "GOI_union"
+exporting_directory <- paste(sep = "","/Users/yanntapponnier/Desktop/",dfname)
+
+YT2_Mfuzz(GOI=dfname,n_cluster =  9, m_fuzziness = 1.5, output_diplay =  c(3,3))
+
+```
